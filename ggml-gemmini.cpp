@@ -17,7 +17,7 @@ static void ggml_backend_gemmini_mul_mat(
 
     const size_t J_pad = zerogod::align_up(J, 16);
 
-    DBG0(">> mul_mat entry: I=%zu, J=%zu, J_pad=%zu, K=%zu\n", I, J, J_pad, K);
+    DBG("mul_mat entry: I=%zu, J=%zu, J_pad=%zu, K=%zu\n", I, J, J_pad, K);
 
     // 1. int8 캐스팅 (패딩 16 B)
     auto *tA = zerogod::ggml_cast_tensor<int8_t>(ctx->tmp_ctx, src0, true, ".i8"); // I×K
