@@ -18,6 +18,17 @@ namespace zerogod
                                                 bool transpose)
     {
         // TODO: 16-byte align & integer casting
+        DBG("generate ggml_gemmini_tensor: %s, transpose=%d\n", src->name, transpose);
+
+        const int cols = transepose ? src->ne[1] : src->ne[0];
+        const int rows = transepose ? src->ne[0] : src->ne[1];
+
+        auto type = ggml_type_of<T>();
+
+        tensor_ = ggml_new_tensor_2d(ctx, type, cols, rows);
+        snprintf(tensor_->name, sizeof(tensor_->name), "%s%s", src->name, suffix);
+
+        update_stride();
     }
 
     // 소멸자 & 버퍼 해제
@@ -34,6 +45,12 @@ namespace zerogod
         }
         tensor_ = nullptr;
         buf_bytes_ = 0;
+    }
+
+    template <typename T>
+    void ggml_gemmini_tensor<T>::ggml_gemmini_cast(size_t rows, size_t cols, bool transpose)
+    {
+        // TODO:
     }
 
     // 이동 생성자 & 이동 대입 연산자 오버라이딩
