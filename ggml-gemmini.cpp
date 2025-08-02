@@ -1,4 +1,4 @@
-#include "ggml-gemmini-util.h"
+#include "ggml-gemmini-tensor.h"
 
 static void ggml_backend_gemmini_mul_mat(
                                          ggml_backend_gemmini_context *ctx,
@@ -29,7 +29,7 @@ static void ggml_backend_gemmini_mul_mat(
         tD = zerogod::ggml_cast_tensor<int32_t>(ctx->tmp_ctx, bias, true, ".i32", false, J_pad);
 
     // 3. 출력 버퍼 패딩
-    const size_t row_pad_bytes = zerogod::align_up(J_pad * sizeof(int32_t), GEMMINI_ROW_ALIGN);
+    const size_t row_pad_bytes = zerogod::align_up(J_pad * sizeof(int32_t), zerogod::GEMMINI_ROW_ALIGN);
     const size_t stride_e_C = row_pad_bytes / sizeof(int32_t);
     auto *tC = ggml_new_tensor_2d(ctx->tmp_ctx, GGML_TYPE_I32, stride_e_C, I);  // J×I
 
