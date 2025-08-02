@@ -20,14 +20,22 @@ namespace zerogod
         // TODO: 16-byte align & integer casting
         DBG("generate ggml_gemmini_tensor: %s, transpose=%d\n", src->name, transpose);
 
-        const int cols = transepose ? src->ne[1] : src->ne[0];
-        const int rows = transepose ? src->ne[0] : src->ne[1];
-
+        /* 1. __________________ 원본 행/열 ____________________ 
+              ggml 네이티브: ne[0] = columns(X), ne[1] = rows(Y) */
+        const int src_cols = transepose ? src->ne[1] : src->ne[0];
+        const int src_rows = transepose ? src->ne[0] : src->ne[1]; 
         auto type = ggml_type_of<T>();
 
-        tensor_ = ggml_new_tensor_2d(ctx, type, cols, rows);
+        /* 2. _____16-byte row-stride 정렬을 위한 colum 패딩_____ */
+        const size_t elem_size = ggml_type_size(type);
+        const size_t align_elems = GEMMINI_ALIGN / elem_size;
+        const int padded_cols = alignup(src_cols, align_elems);
+        
+        /* 3. ___________________tensor 생성_____________________*/
+        tensor_ = ggml_new_tensor_2d(ctx, type, padded_cols, src_rows);
         snprintf(tensor_->name, sizeof(tensor_->name), "%s%s", src->name, suffix);
 
+        
         update_stride();
     }
 

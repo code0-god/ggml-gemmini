@@ -10,7 +10,7 @@
 
 namespace zerogod
 {
-    constexpr size_t GEMMINI_ROW_ALIGN = 16; // 16-byte align
+    constexpr size_t GEMMINI_ALIGN = 16; // 16-byte align
 
     template <typename T>
     class ggml_gemmini_tensor
