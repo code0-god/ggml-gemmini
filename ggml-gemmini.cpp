@@ -1,7 +1,7 @@
+#define DEBUG 1
+
 #include "ggml-gemmini-tensor.h"
 #include "include/gemmini.h"
-
-#define DEBUG 1
 
 using namespace zerogod;
 

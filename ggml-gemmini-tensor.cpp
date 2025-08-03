@@ -1,4 +1,6 @@
 // ggml-gemmini-tensor.cpp
+#define DEBUG 1
+
 #include "ggml-gemmini-tensor.h"
 
 namespace zerogod

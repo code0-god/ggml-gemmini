@@ -1,4 +1,8 @@
 // ggml-gemmini-util.h
+#ifndef DEBUG
+#define DEBUG 0
+#endif
+
 #include "ggml-impl.h"
 #include "ggml-gemmini.h"
 #include "ggml-backend-impl.h"
