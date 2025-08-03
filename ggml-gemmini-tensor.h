@@ -1,4 +1,7 @@
 // ggml-gemmini-tensor.h
+#ifndef __GGML_GEMMINI_TENSOR_H__
+#define __GGML_GEMMINI_TENSOR_H__
+
 #include <cstdint>
 #include <cstddef>
 #include <type_traits>
@@ -54,3 +57,5 @@ namespace zerogod
     extern template class ggml_gemmini_tensor<int8_t>;
     extern template class ggml_gemmini_tensor<int32_t>;
 }
+
+#endif // __GGML_GEMMINI_TENSOR_H__
