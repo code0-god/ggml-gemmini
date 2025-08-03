@@ -15,7 +15,7 @@
 #define PRINT_TILE 0
 #endif
 
-#ifdef DEBUG 
+#if DEBUG 
     #define DBG(fmt, ...) \
         fprintf(stderr, "[%s:%d] %s(): " fmt "\n", __FILE__, __LINE__, __func__, ##__VA_ARGS__)
 #else
