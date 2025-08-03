@@ -14,8 +14,14 @@
 #ifndef PRINT_TILE
 #define PRINT_TILE 0
 #endif
-#define DBG(fmt, ...) \
-    fprintf(stderr, "[%s:%d] %s(): " fmt "\n", __FILE__, __LINE__, __func__, ##__VA_ARGS__)
+
+#ifdef DEBUG 
+    #define DBG(fmt, ...) \
+        fprintf(stderr, "[%s:%d] %s(): " fmt "\n", __FILE__, __LINE__, __func__, ##__VA_ARGS__)
+#else
+    #define DBG(fmt, ...)  ((void)0)
+#endif
+
 
 struct ggml_backend_gemmini_context
 {
