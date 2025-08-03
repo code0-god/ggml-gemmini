@@ -29,8 +29,6 @@ namespace zerogod
 
         ~ggml_gemmini_tensor();
 
-        void ggml_gemmini_cast(size_t rows, size_t cols, bool transpose); // data casting
-
         // 이동 전용 구현
         ggml_gemmini_tensor(ggml_gemmini_tensor &&) noexcept;            // 이동 생성자
         ggml_gemmini_tensor &operator=(ggml_gemmini_tensor &&) noexcept; // 이동 대입
@@ -42,10 +40,9 @@ namespace zerogod
         void *get() noexcept { return data_; }
         const void *get() const noexcept { return data_; }
 
-        // stride 재계산
-        void update_stride();
-
     private:
+        void ggml_gemmini_cast(size_t rows, size_t cols, bool transpose); // data casting
+        void update_stride();                                             // stride 재계산
         void free_buffer();
 
         ggml_tensor *tensor_ = nullptr; // 변환된 텐서
