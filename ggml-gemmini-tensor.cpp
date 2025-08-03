@@ -17,26 +17,30 @@ namespace zerogod
                                                 const char *suffix,
                                                 bool transpose)
     {
-        // TODO: 16-byte align & integer casting
+        
         DBG("generate ggml_gemmini_tensor: %s, transpose=%d\n", src->name, transpose);
 
-        /* 1. __________________ 원본 행/열 ____________________ 
+        /* 1. ____________________원본 행/열____________________ 
               ggml 네이티브: ne[0] = columns(X), ne[1] = rows(Y) */
-        const int src_cols = transepose ? src->ne[1] : src->ne[0];
-        const int src_rows = transepose ? src->ne[0] : src->ne[1]; 
+        const int src_cols = transpose ? src->ne[1] : src->ne[0];
+        const int src_rows = transpose ? src->ne[0] : src->ne[1]; 
         auto type = ggml_type_of<T>();
 
         /* 2. _____16-byte row-stride 정렬을 위한 colum 패딩_____ */
         const size_t elem_size = ggml_type_size(type);
         const size_t align_elems = GEMMINI_ALIGN / elem_size;
-        const int padded_cols = alignup(src_cols, align_elems);
+        const int padded_cols = align_up(src_cols, align_elems);
         
-        /* 3. ___________________tensor 생성_____________________*/
+        /* 3. ___________________tensor 생성___________________ */
         tensor_ = ggml_new_tensor_2d(ctx, type, padded_cols, src_rows);
         snprintf(tensor_->name, sizeof(tensor_->name), "%s%s", src->name, suffix);
 
         DBG("generated tensor: cols=%d, rows=%d\n", tensor_->ne[0], tensor_->ne[1]);
 
+        /* 4. ______________data 복제 및 casting_______________ */
+        ggml_gemmini_cast(src_rows, padded_cols, transpose);
+
+        /* 5. _________________stride 업데이트__________________ */
         update_stride();
     }
 
