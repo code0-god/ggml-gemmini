@@ -1,34 +1,36 @@
 #include "ggml-gemmini-tensor.h"
+#include "include/gemmini.h"
+
+#define DEBUG 1
+
 using namespace zerogod;
 
 static void ggml_backend_gemmini_mul_mat(
                                          ggml_backend_gemmini_context *ctx,
                                          struct ggml_tensor *dst, // FP32 output (I×J)
-                                         struct ggml_tensor *bias) // optional FP32 bias (→int32)
+                                         struct ggml_tensor *bias) // optional FP32 bias (->int32)
 {
+    // TODO: bias 처리
     DBG("[Gemmini] mul_mat call\n");
 
     // 0. 원본 FP32 입력 텐서
-    const auto *src0 = dst->src[0];         // A:  I×K
-    const auto *src1 = dst->src[1];         // B:  K×J
+    const auto *src0 = dst->src[0];         // A:  I × K
+    const auto *src1 = dst->src[1];         // B:  J × K
 
     DBG("dst shape:\n ne = [%llu, %llu, %llu, %llu]\n", dst->ne[0], dst->ne[1], dst->ne[2], dst->ne[3]);
     DBG("src0 shape:\n ne = [%llu, %llu, %llu, %llu]\n", src0->ne[0], src0->ne[1], src0->ne[2], src0->ne[3]);
     DBG("src1 shape:\n ne = [%llu, %llu, %llu, %llu]\n", src1->ne[0], src1->ne[1], src1->ne[2], src1->ne[3]);
 
-    const size_t I = src0->ne[1];   // rows
-    const size_t J = src1->ne[1];   // cols
+    const size_t I = src0->ne[1];   // A.ne[0] = K, A.ne[1] = I
+    const size_t J = src1->ne[0];   // B.ne[0] = J, B.ne[1] = K
     const size_t K = src0->ne[0];
+    DBG("I=%zu, J=%zu, K=%zu\n", I, J, K);
 
     ggml_gemmini_tensor<int8_t> tA(ctx->tmp_ctx, src0, ".i8");
-    ggml_gemmini_tensor<int8_t> tB(ctx->tmp_ctx, src1, ".i8");
-    ggml_gemmini_tensor<int32_t> tD(ctx->tmp_ctx, bias, ".i32");
-
-    // 위 코드까지 확인
-    // 2. bias
-    ggml_tensor *tD = nullptr;
+    ggml_gemmini_tensor<int8_t> tB(ctx->tmp_ctx, src1, ".i8", true);
+    ggml_gemmini_tensor<int8_t> tC(ctx->tmp_ctx, dst, ".i8");
     if (bias)
-        tD = zerogod::ggml_cast_tensor<int32_t>(ctx->tmp_ctx, bias, true, ".i32", false, J_pad);
+        ggml_gemmini_tensor<int32_t> tD(ctx->tmp_ctx, bias, ".i32");
 
     // 3. 출력 버퍼 패딩
     const size_t row_pad_bytes = zerogod::align_up(J_pad * sizeof(int32_t), zerogod::GEMMINI_ROW_ALIGN);
