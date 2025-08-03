@@ -1,4 +1,5 @@
 #include "ggml-gemmini-tensor.h"
+using namespace zerogod;
 
 static void ggml_backend_gemmini_mul_mat(
                                          ggml_backend_gemmini_context *ctx,
@@ -11,18 +12,19 @@ static void ggml_backend_gemmini_mul_mat(
     const auto *src0 = dst->src[0];         // A:  I×K
     const auto *src1 = dst->src[1];         // B:  K×J
 
-    const size_t I = src0->ne[1];   // rows  (A 의 두 번째 차원)
-    const size_t J = src1->ne[1];   // cols  (B 의 두 번째 차원)
+    DBG("dst shape:\n ne = [%llu, %llu, %llu, %llu]\n", dst->ne[0], dst->ne[1], dst->ne[2], dst->ne[3]);
+    DBG("src0 shape:\n ne = [%llu, %llu, %llu, %llu]\n", src0->ne[0], src0->ne[1], src0->ne[2], src0->ne[3]);
+    DBG("src1 shape:\n ne = [%llu, %llu, %llu, %llu]\n", src1->ne[0], src1->ne[1], src1->ne[2], src1->ne[3]);
+
+    const size_t I = src0->ne[1];   // rows
+    const size_t J = src1->ne[1];   // cols
     const size_t K = src0->ne[0];
 
-    const size_t J_pad = zerogod::align_up(J, 16);
+    ggml_gemmini_tensor<int8_t> tA(ctx->tmp_ctx, src0, ".i8");
+    ggml_gemmini_tensor<int8_t> tB(ctx->tmp_ctx, src1, ".i8");
+    ggml_gemmini_tensor<int32_t> tD(ctx->tmp_ctx, bias, ".i32");
 
-    DBG("mul_mat entry: I=%zu, J=%zu, J_pad=%zu, K=%zu\n", I, J, J_pad, K);
-
-    // 1. int8 캐스팅 (패딩 16 B)
-    auto *tA = zerogod::ggml_cast_tensor<int8_t>(ctx->tmp_ctx, src0, true, ".i8"); // I×K
-    auto *tB = zerogod::ggml_cast_tensor<int8_t>(ctx->tmp_ctx, src1, true, ".i8", true); // K×J
-
+    // 위 코드까지 확인
     // 2. bias
     ggml_tensor *tD = nullptr;
     if (bias)

@@ -35,7 +35,8 @@ namespace zerogod
         tensor_ = ggml_new_tensor_2d(ctx, type, padded_cols, src_rows);
         snprintf(tensor_->name, sizeof(tensor_->name), "%s%s", src->name, suffix);
 
-        
+        DBG("generated tensor: cols=%d, rows=%d\n", tensor_->ne[0], tensor_->ne[1]);
+
         update_stride();
     }
 
