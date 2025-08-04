@@ -27,8 +27,8 @@ static void ggml_backend_gemmini_mul_mat(
     DBG("I=%zu, J=%zu, K=%zu\n", I, J, K);
 
     ggml_gemmini_tensor<int8_t> tA(ctx->tmp_ctx, src0, ".i8");
-    ggml_gemmini_tensor<int8_t> tB(ctx->tmp_ctx, src1, ".i8", true);
-    ggml_gemmini_tensor<int8_t> tC(ctx->tmp_ctx, dst, ".i8");
+    ggml_gemmini_tensor<int8_t> tB(ctx->tmp_ctx, src1, ".i8", false, true);
+    ggml_gemmini_tensor<int8_t> tC(ctx->tmp_ctx, dst, ".i8", true);
     if (bias)
         ggml_gemmini_tensor<int32_t> tD(ctx->tmp_ctx, bias, ".i32");
 
@@ -128,7 +128,7 @@ static enum ggml_status ggml_backend_gemmini_graph_compute(ggml_backend_t backen
         struct ggml_init_params ip = {
             /* .mem_size   = */ 320ull * 1024 * 1024, // 320MiB
             /* .mem_buffer = */ NULL,
-            /* .no_alloc   = */ false,
+            /* .no_alloc   = */ true, // 헤더만 
         };
 
         ctx->tmp_ctx = ggml_init(ip);

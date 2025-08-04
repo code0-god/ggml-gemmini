@@ -23,6 +23,7 @@ namespace zerogod
         ggml_gemmini_tensor(ggml_context *ctx,
                             const ggml_tensor *src,
                             const char *suffix = "_cast",
+                            bool acc = false,
                             bool transpose = false);
 
         ~ggml_gemmini_tensor();
@@ -39,7 +40,7 @@ namespace zerogod
         const void *get() const noexcept { return data_; }
 
     private:
-        void ggml_gemmini_cast(size_t rows, size_t cols, bool transpose); // data casting
+        void ggml_gemmini_cast(size_t src_rows, size_t src_cols, size_t dst_cols, const void *src_data, bool transpose) const; // data casting
         void update_stride();                                             // stride 재계산
         void free_buffer();
 
