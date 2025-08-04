@@ -21,7 +21,7 @@ namespace zerogod
                                                 bool transpose)
     {
 
-        DBG("generate ggml_gemmini_tensor: %s, transpose=%d\n", src->name, transpose);
+        DBG("\ngenerate ggml_gemmini_tensor from: %s, type=%s transpose=%d\n", src->name, ggml_type_name(src->type), transpose);
 
         /* 1. ____________________원본 행/열____________________
               ggml 네이티브: ne[0] = columns(X), ne[1] = rows(Y) */
@@ -48,11 +48,11 @@ namespace zerogod
         tensor_->nb[0] = elem_size;
         tensor_->nb[1] = row_bytes;
 
-        DBG("generated tensor: cols=%d, rows=%d, buf_bytes=%zu\n", tensor_->ne[0], tensor_->ne[1], buf_bytes_);
+        DBG("\ngenerated tensor: type=%s, cols=%d, rows=%d, buf_bytes=%zu\n", ggml_type_name(type), tensor_->ne[0], tensor_->ne[1], buf_bytes_);
 
         /* 5. _______________casting & 0-fill _________________ */
         if (!acc)
-            ggml_gemmini_cast(src_rows, src_cols, padded_cols, src->data, transpose);
+            ggml_gemmini_cast(src, padded_cols, transpose);
         else
             std::memset(data_, 0, buf_bytes_);
 
@@ -89,7 +89,7 @@ namespace zerogod
 
     template <typename T>
     ggml_gemmini_tensor<T> &
-    ggml_gemmini_tensor<T>::operator=(ggml_gemmini_tensor &&other) noexcept
+        ggml_gemmini_tensor<T>::operator=(ggml_gemmini_tensor &&other) noexcept
     {
         if (this != &other)
         {
@@ -105,33 +105,62 @@ namespace zerogod
     }
 
     template <typename T>
-    void ggml_gemmini_tensor<T>::ggml_gemmini_cast(size_t src_rows,
-                                                   size_t src_cols,
+    void ggml_gemmini_tensor<T>::ggml_gemmini_cast(const ggml_tensor *src,
                                                    size_t dst_cols,
-                                                   const void *src_data,
                                                    bool transpose) const
     {
-        const size_t elem_size = ggml_type_size(ggml_type_of<T>());
-        const size_t row_bytes = tensor_->nb[1];
+        /* _________________1. 원본 shape/stride_________________*/
+        const int src_cols = transpose ? src->ne[1] : src->ne[0];
+        const int src_rows = transpose ? src->ne[0] : src->ne[1];
 
-        const float *src_f32 = static_cast<const float *>(src_data);
+        const size_t src_row_bytes = src->nb[1]; // 행 간 byte-stride
+        const size_t src_col_bytes = src->nb[0]; // 열 간 byte-stride
+
+        /* _____________________2. dst 정보______________________*/
         uint8_t *dst_row = static_cast<uint8_t *>(tensor_->data);
+        const size_t dst_row_bytes = tensor_->nb[1]; // 16B align된 값
+        const size_t elem_size = ggml_type_size(ggml_type_of<T>());
 
-        for (size_t r = 0; r < src_rows; ++r)
+        /* ___________________3. 원본 타입별 분기__________________*/
+        switch (src->type)
         {
-            T *dst_elem = reinterpret_cast<T *>(dst_row);
-            if (!transpose)
-                for (size_t c = 0; c < src_cols; ++c)
-                    dst_elem[c] = static_cast<T>(src_f32[r * src_cols + c]);
-            else
-                for (size_t c = 0; c < src_cols; ++c)
-                    dst_elem[c] = static_cast<T>(src_f32[c * src_rows + r]);
+        case GGML_TYPE_F32:
+        {
+            const uint8_t *src_base = static_cast<const uint8_t *>(src->data);
 
-            // 0-fill
-            if (src_cols < dst_cols)
-                std::memset(dst_elem + src_cols, 0, (dst_cols - src_cols) * elem_size);
+            for (size_t r = 0; r < src_rows; ++r)
+            {
+                T *dst_elem = reinterpret_cast<T *>(dst_row);
+                if (!transpose)
+                    // src 행 r 를 그대로 복사 : 주소 = base + r*src_row_bytes + c*src_col_bytes
+                    for (size_t c = 0; c < src_cols; ++c)
+                    {
+                        const _Float32 *p = reinterpret_cast<const _Float32 *>(src_base + r * src_row_bytes + c * src_col_bytes);
+                        dst_elem[c] = static_cast<T>(*p);
+                    }
+                else
+                    // 전치 복사 : src( c , r ) -> dst( r , c )
+                    for (size_t c = 0; c < src_cols; ++c)
+                    {
+                        const _Float32 *p = reinterpret_cast<const _Float32 *>(src_base + c * src_row_bytes + r * src_col_bytes);
+                        dst_elem[c] = static_cast<T>(*p);
+                    }
 
-            dst_row += row_bytes;
+                // 0-fill
+                if (src_cols < dst_cols)
+                    std::memset(dst_elem + src_cols, 0, (dst_cols - src_cols) * elem_size);
+
+                dst_row += dst_row_bytes;
+            }
+            break;
+        }
+        case GGML_TYPE_Q8_0:
+        {   
+            // TODO: Q8_0 복사
+            break;
+        }
+        default:
+            GGML_ASSERT(false && "ggml_gemmini_cast: unsupported src type");
         }
     }
 

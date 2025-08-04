@@ -40,7 +40,7 @@ namespace zerogod
         const void *get() const noexcept { return data_; }
 
     private:
-        void ggml_gemmini_cast(size_t src_rows, size_t src_cols, size_t dst_cols, const void *src_data, bool transpose) const; // data casting
+        void ggml_gemmini_cast(const ggml_tensor *src, size_t dst_cols, bool transpose) const; // data casting
         void update_stride();                                             // stride 재계산
         void free_buffer();
 
