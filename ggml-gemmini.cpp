@@ -2,6 +2,7 @@
 
 #include "ggml-gemmini-tensor.h"
 #include "include/gemmini.h"
+#include <optional>
 
 using namespace zerogod;
 
@@ -17,59 +18,47 @@ static void ggml_backend_gemmini_mul_mat(
     const auto *src0 = dst->src[0];         // A:  I × K
     const auto *src1 = dst->src[1];         // B:  K × J (But transpose되어 메모리상 J x K)
 
-    DBG("dst shape:\n ne = [%llu, %llu, %llu, %llu]\n", dst->ne[0], dst->ne[1], dst->ne[2], dst->ne[3]);
-    DBG("src0 shape:\n ne = [%llu, %llu, %llu, %llu]\n", src0->ne[0], src0->ne[1], src0->ne[2], src0->ne[3]);
-    DBG("src1 shape:\n ne = [%llu, %llu, %llu, %llu]\n", src1->ne[0], src1->ne[1], src1->ne[2], src1->ne[3]);
-
-    const size_t I = src0->ne[1];   // I = A.ne[1], K = A.ne[0]
-    const size_t J = src1->ne[1];   // K = B.ne[0], J = B.ne[1] (transpose)
-    const size_t K = src0->ne[0];
-    DBG("I=%zu, J=%zu, K=%zu\n", I, J, K);
+    DBG("\ndst shape:\n ne = [%llu, %llu, %llu, %llu]\n", dst->ne[0], dst->ne[1], dst->ne[2], dst->ne[3]);
+    DBG("\nsrc0 shape:\n ne = [%llu, %llu, %llu, %llu]\n", src0->ne[0], src0->ne[1], src0->ne[2], src0->ne[3]);
+    DBG("\nsrc1 shape:\n ne = [%llu, %llu, %llu, %llu]\n", src1->ne[0], src1->ne[1], src1->ne[2], src1->ne[3]);
 
     ggml_gemmini_tensor<int8_t> tA(ctx->tmp_ctx, src0, ".i8");
     ggml_gemmini_tensor<int8_t> tB(ctx->tmp_ctx, src1, ".i8", false, true);
     ggml_gemmini_tensor<int8_t> tC(ctx->tmp_ctx, dst, ".i8", true);
+    std::optional<ggml_gemmini_tensor<int32_t>> tD;
     if (bias)
-        ggml_gemmini_tensor<int32_t> tD(ctx->tmp_ctx, bias, ".i32");
+        tD.emplace(ctx->tmp_ctx, bias, ".i32");
 
-
-    /*
-    // 3. 출력 버퍼 패딩
-    const size_t row_pad_bytes = zerogod::align_up(J_pad * sizeof(int32_t), zerogod::GEMMINI_ROW_ALIGN);
-    const size_t stride_e_C = row_pad_bytes / sizeof(int32_t);
-    auto *tC = ggml_new_tensor_2d(ctx->tmp_ctx, GGML_TYPE_I32, stride_e_C, I);  // J×I
-
-    memset(tC->data, 0, row_pad_bytes * I);
+    const size_t I = tC.get_rows(); // I = A.ne[1], K = A.ne[0]
+    const size_t J = tC.get_cols(); // K = B.ne[0], J = B.ne[1] (transpose)
+    const size_t K = tA.get_cols();
+    DBG("I=%zu, J=%zu, K=%zu\n", I, J, K);
 
     // stride
-    const size_t sA = tA->nb[1] / sizeof(elem_t);       // == align_up(K,16)
-    const size_t sB = tB->nb[1] / sizeof(elem_t);       // == align_up(K,16)
-    const size_t sC = stride_e_C;                       // 16 배수
-    const size_t sC_CPU = sC * sizeof(int32_t) / sizeof(elem_t);
-
+    const size_t sA = tA.get_stride();
+    const size_t sB = tB.get_stride();
+    const size_t sC = tC.get_stride();
     GGML_ASSERT(sA % 16 == 0);
     GGML_ASSERT(sB % 16 == 0);
     GGML_ASSERT(sC % 16 == 0);
 
-    // 4. bias 파라미터 준비
-    std::vector<int32_t> zero_bias(J_pad, 0);
-    const int32_t *D = bias ? (int32_t *)tD->data : zero_bias.data();
-    const size_t   sD = bias ? tD->nb[1] / sizeof(int32_t) : 0;
-    const bool repeating = bias ? (bias->ne[1] == 1) : true;
+    // bias tensor
+    std::vector<int32_t> zero_bias(tC.get_cols(), 0); 
 
-    DBG0("    calling tiled_matmul_auto: ptrA=%p ptrB=%p ptrD=%p ptrC=%p\n",
-           (void*)tA->data, (void*)tB->data, (void*)D, (void*)tC->data);
-    DBG0("    strides: sA=%zu, sB=%zu, sC=%zu, sD=%zu, rep=%d\n",
-           sA, sB, sC, sD, repeating);
+    const int32_t *bias_data = tD ? static_cast<int32_t *>(tD->get()) : zero_bias.data();
+    const size_t sD = tD ? tD->get_stride() : 0;
+    const bool repeating = tD ? tD->get_rows() == 1 : true;
 
+    DBG("calling tiled_matmul_auto: ptrA=%p ptrB=%p ptrD=%p ptrC=%p\n",
+           (void*)tA.get(), (void*)tB.get(), (void*)bias_data, (void*)tC.get());
 
-    // 5. Gemmini 호출 HW
-    tiled_matmul_auto(I, J_pad, K,
-                      (elem_t*)tA->data,
-                      (elem_t*)tB->data,
-                      (void*)D,
-                      (elem_t*)tC->data,
-                      sA, sB, sD, sC_CPU,
+    // 5. Gemmini 호출
+    tiled_matmul_auto(I, J, K,
+                      (elem_t*)tA.get(),
+                      (elem_t*)tB.get(),
+                      (void*)bias_data,
+                      (elem_t*)tC.get(),
+                      sA, sB, sD, sC,
                       1.f, 1.f, 1.f,
                       NO_ACTIVATION,
                       1, 1,
@@ -79,6 +68,7 @@ static void ggml_backend_gemmini_mul_mat(
                       false, false,
                       0, CPU);
 
+    /*
     // 6. int32 -> float 결과 복사 (stride 사용)
     float   *out_f = (float*)dst->data;
     int32_t *acc32 = (int32_t*)tC->data;

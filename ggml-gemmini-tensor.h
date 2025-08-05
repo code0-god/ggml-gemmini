@@ -38,15 +38,25 @@ namespace zerogod
         // Gemmini 커널용 데이터 버퍼
         void *get() noexcept { return data_; }
         const void *get() const noexcept { return data_; }
+        
+        // dimension 접근
+        size_t get_rows() const noexcept { return rows_; }
+        size_t get_cols() const noexcept { return cols_; }
+
+        // stride 접근
+        size_t get_stride() const noexcept { return stride_; }
 
     private:
-        void ggml_gemmini_cast(const ggml_tensor *src, size_t dst_cols, bool transpose) const; // data casting
+        void ggml_gemmini_cast(const ggml_tensor *src, bool transpose) const; // data casting
         void update_stride();                                             // stride 재계산
         void free_buffer();
 
         ggml_tensor *tensor_ = nullptr; // 변환된 텐서
         void *data_ = nullptr;          // casting & align된 data 버퍼
         size_t buf_bytes_ = 0;          // 할당된 바이트 수
+        size_t rows_ = 0;
+        size_t cols_ = 0;
+        size_t stride_ = 0;             // stride in elements
     };
 
     // explicit instantiation : 지원 타입 한정
